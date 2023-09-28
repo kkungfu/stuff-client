@@ -20,17 +20,6 @@ pub fn build_tray() -> Option<TrayIcon> {
     let icon = load_icon(std::path::Path::new(path));
 
     let tray_menu = Menu::new();
-    match tray_menu.append_items(&[
-        &MenuItem::new("Menu #1", true, None),
-        &MenuItem::new("Menu #2", true, None),
-        &PredefinedMenuItem::separator(),
-        &MenuItem::new("Exit", true, None),
-    ]) {
-        Ok(..) => {},
-        Err(err) => {
-            println!("failed to create tray menu: {}", err);
-        }
-    };
 
     // Since winit doesn't use gtk on Linux, and we need gtk for
     // the tray icon to show up, we need to spawn a thread
