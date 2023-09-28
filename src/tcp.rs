@@ -14,10 +14,9 @@ pub fn tcp_client(mut stream: TcpStream) {
     let mut send_buffer = String::new();
     let mut receive_buffer = [0; 4098];
 
-    println!("** STREAM START **");
     loop {
         send_buffer.clear();
-        io::stdin().read_line(&mut send_buffer).unwrap();
+        io::stdin().read_line(&mut send_buffer).unwrap();        
 
         match stream.write(&*send_buffer.clone().into_bytes()) {
             Ok(send_size) => {

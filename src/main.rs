@@ -25,7 +25,7 @@ fn main() {
             },
             Err(err) => {
                 println!("{}", err);
-                sleep(Duration::from_secs(10));
+                sleep(Duration::from_secs(1));
             }
         };
     }
