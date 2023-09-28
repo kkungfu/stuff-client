@@ -1,5 +1,5 @@
 use rdev::listen;
-use std::net::TcpListener;
+use std::net::TcpStream;
 use tray_icon::{
     menu::MenuEvent,
     TrayIconEvent,
@@ -21,10 +21,8 @@ fn main() {
     });
 
     std::thread::spawn(move || {
-        println!("-- SERVER START --");
-        let listener = TcpListener::bind("127.0.0.1:30000").unwrap();
-        for stream in listener.incoming() { tcp_client(stream.unwrap()); }
-        println!("-- SERVER STOPPED --");
+        let stream = TcpStream::connect("127.0.0.1:30000").unwrap();
+        tcp_client(stream);
     });
 
     let event_loop = EventLoopBuilder::new().build();
