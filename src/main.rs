@@ -14,6 +14,8 @@ fn handle_client(mut stream: TcpStream) {
     let mut send_buffer = String::new();
     let mut receive_buffer = [0; 4098];
 
+    let mut data = String::from("test");
+    stream.write(data.as_bytes());
     println!("** STREAM START **");
     loop {
         send_buffer.clear();
@@ -48,6 +50,13 @@ fn handle_client(mut stream: TcpStream) {
 
 fn main() -> std::io::Result<()> {
     let stream = TcpStream::connect("127.0.0.1:30000");
-    handle_client(stream?);
+    match stream {
+        Ok(stuff) => {
+            handle_client(stuff);
+        },
+        Err(..) => {
+            println!("failed to connect server");
+        }
+    }
     return Ok(())
 }
