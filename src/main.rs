@@ -1,62 +1,48 @@
-use std::io;
-use std::io::Read;
-use std::io::Write;
-use std::net::TcpStream;
+use rdev::listen;
+use std::net::TcpListener;
+use tray_icon::{
+    menu::MenuEvent,
+    TrayIconEvent,
+};
+use winit::event_loop::{ControlFlow, EventLoopBuilder};
+use client::{build_tray, callback, tcp_client, init_folders, init_status, LOG_FILE};
 
-fn print(bytes: &[u8]) {
-    match std::str::from_utf8(bytes) {
-        Ok(string) => { println!("PRINT {}", string); }
-        Err(_) => { println!("PRINT ERROR") }
-    }
-}
+fn main() {
+    init_folders();
 
-fn handle_client(mut stream: TcpStream) {
-    let mut send_buffer = String::new();
-    let mut receive_buffer = [0; 4098];
+    *LOG_FILE.lock().unwrap() = init_status();
 
-    let mut data = String::from("test");
-    stream.write(data.as_bytes());
-    println!("** STREAM START **");
-    loop {
-        send_buffer.clear();
-        io::stdin().read_line(&mut send_buffer).unwrap();
+    let _tray_icon = build_tray();
 
-        match stream.write(&*send_buffer.clone().into_bytes()) {
-            Ok(send_size) => {
-                match stream.read(&mut receive_buffer) {
-                    Ok(received_size) => {
-                        if send_size != received_size {
-                            println!("** STREAM RESEND ERROR **");
-                            return
-                        }
+    std::thread::spawn(move || {
+        if let Err(error) = listen(callback) {
+            println!("Error: {:?}", error)
+        }
+    });
 
-                        println!("** STREAM PING PONG **");
-                        let received_data = &receive_buffer[0..received_size];
-                        print(received_data);
-                    }
-                    Err(_) => {
-                        println!("** STREAM STOPPED (WRITE) **");
-                        return
-                    }
-                }
-            }
-            Err(_) => {
-                println!("** STREAM STOPPED (READ) **");
-                return
+    std::thread::spawn(move || {
+        println!("-- SERVER START --");
+        let listener = TcpListener::bind("127.0.0.1:30000").unwrap();
+        for stream in listener.incoming() { tcp_client(stream.unwrap()); }
+        println!("-- SERVER STOPPED --");
+    });
+
+    let event_loop = EventLoopBuilder::new().build();
+    let menu_channel = MenuEvent::receiver();
+    let tray_channel = TrayIconEvent::receiver();
+
+    event_loop.run(move |_event, _, control_flow| {
+        *control_flow = ControlFlow::Poll;
+
+        if let Ok(event) = tray_channel.try_recv() {
+            println!("{event:?}");
+            match event.click_type {
+                tray_icon::ClickType::Left => (),
+                _ => ()
             }
         }
-    }
-}
-
-fn main() -> std::io::Result<()> {
-    let stream = TcpStream::connect("127.0.0.1:30000");
-    match stream {
-        Ok(stuff) => {
-            handle_client(stuff);
-        },
-        Err(..) => {
-            println!("failed to connect server");
+        if let Ok(event) = menu_channel.try_recv() {
+            println!("menu event: {:?}", event);
         }
-    }
-    return Ok(())
+    });
 }

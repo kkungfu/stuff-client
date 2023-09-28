@@ -1,1 +1,2 @@
-# stuff-client
+# monitor
+Rust Activity Tracker
