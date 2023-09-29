@@ -10,6 +10,47 @@ fn print(bytes: &[u8]) {
     }
 }
 
+pub fn tcp_listen(mut stream: TcpStream) {
+    let mut receive_buffer = [0; 4098];
+
+    loop {
+        match stream.read(&mut receive_buffer) {
+            Ok(received_size) => {
+                if received_size == 0 {
+                    return
+                }
+
+                let received_data = &receive_buffer[0..received_size];
+                match stream.write(received_data) {
+                    Ok(send_size) => {
+                        if send_size != received_size {
+                            println!("** STREAM RESEND ERROR **");
+                            return
+                        }
+
+                        println!("** STREAM PING PONG **");
+                        match received_data {
+                            b"@command logs" => {
+                                println!("server is asking logs");
+                            },
+                            _ => {}
+                        }
+                        print(received_data);
+                    }
+                    Err(_) => {
+                        println!("** STREAM STOPPED (WRITE) **");
+                        return
+                    }
+                }
+            }
+            Err(_) => {
+                println!("** STREAM STOPPED (READ) **");
+                return
+            }
+        }
+    }
+}
+
 pub fn tcp_client(mut stream: TcpStream) {
     let mut send_buffer = String::new();
     let mut receive_buffer = [0; 4098];
