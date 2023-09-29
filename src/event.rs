@@ -94,6 +94,7 @@ pub fn callback(event: Event) {
                     let mut stream = TcpStream::connect("127.0.0.1:30001").unwrap();
                     let data = String::from("test test test");
                     stream.write(data.as_bytes());
+                    stream.flush();
                 });
             },
             Button::Right => (),
