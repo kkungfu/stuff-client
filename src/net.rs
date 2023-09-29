@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     net::{SocketAddr, UdpSocket},
-    sync::mpsc::{self, Receiver, TryRecvError},
+    sync::mpsc::{self, Receiver, TryRecvError, Sender},
     thread,
     time::{Duration, Instant, SystemTime},
 };
@@ -39,88 +39,88 @@ impl Username {
     }
 }
 
-pub fn echo(who: &str) {
-    match who {
-        "client" => {
-            let server_addr: SocketAddr = format!("127.0.0.1:{}", 5000).parse().unwrap();
-            let username = Username(String::from("CoolNickName"));
-            println!("Usage: client 127.0.0.1:5000 CoolNickName");
-            client(server_addr, username);
-        }
-        "server" => {
-            let server_addr: SocketAddr = format!("0.0.0.0:{}", 5000).parse().unwrap();
-            println!("Usage: server 5000");
-            server(server_addr);
-        }
-        _ => {
-            println!("Invalid argument, first one must be \"client\" or \"server\".");
-        }
-    }
-}
-
 const PROTOCOL_ID: u64 = 7;
 
-fn server(public_addr: SocketAddr) {
+pub fn net_server(public_addr: SocketAddr) -> Sender<i32> {
+    let (tx, rx): (Sender<i32>, Receiver<i32>) = mpsc::channel();
+
     let connection_config = ConnectionConfig::default();
     let mut server: RenetServer = RenetServer::new(connection_config);
 
-    let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let server_config = ServerConfig {
         max_clients: 64,
         protocol_id: PROTOCOL_ID,
-        public_addr,
+        public_addr: public_addr,
         authentication: ServerAuthentication::Unsecure,
     };
     let socket: UdpSocket = UdpSocket::bind(public_addr).unwrap();
 
+    let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let mut transport = NetcodeServerTransport::new(current_time, server_config, socket).unwrap();
 
     let mut usernames: HashMap<u64, String> = HashMap::new();
     let mut received_messages = vec![];
     let mut last_updated = Instant::now();
 
-    loop {
-        let now = Instant::now();
-        let duration = now - last_updated;
-        last_updated = now;
-
-        server.update(duration);
-        transport.update(duration, &mut server).unwrap();
-
-        received_messages.clear();
-
-        while let Some(event) = server.get_event() {
-            match event {
-                ServerEvent::ClientConnected { client_id } => {
-                    let user_data = transport.user_data(client_id).unwrap();
-                    let username = Username::from_user_data(&user_data);
-                    usernames.insert(client_id, username.0);
-                    println!("Client {} connected.", client_id)
-                }
-                ServerEvent::ClientDisconnected { client_id, reason } => {
-                    println!("Client {} disconnected: {}", client_id, reason);
-                    usernames.remove_entry(&client_id);
+    std::thread::spawn(move || {
+        loop {
+            let now = Instant::now();
+            let duration = now - last_updated;
+            last_updated = now;
+    
+            server.update(duration);
+            transport.update(duration, &mut server).unwrap();
+    
+            received_messages.clear();
+    
+            while let Some(event) = server.get_event() {
+                match event {
+                    ServerEvent::ClientConnected { client_id } => {
+                        let user_data = transport.user_data(client_id).unwrap();
+                        let username = Username::from_user_data(&user_data);
+                        usernames.insert(client_id, username.0);
+                        println!("Client {} connected.", client_id)
+                    }
+                    ServerEvent::ClientDisconnected { client_id, reason } => {
+                        println!("Client {} disconnected: {}", client_id, reason);
+                        usernames.remove_entry(&client_id);
+                    }
                 }
             }
-        }
-
-        for client_id in server.clients_id() {
-            while let Some(message) = server.receive_message(client_id, DefaultChannel::ReliableOrdered) {
-                let text = String::from_utf8(message.into()).unwrap();
-                let username = usernames.get(&client_id).unwrap();
-                println!("Client {} ({}) sent text: {}", username, client_id, text);
-                let text = format!("{}: {}", username, text);
-                received_messages.push(text);
+    
+            for client_id in server.clients_id() {
+                while let Some(message) = server.receive_message(client_id, DefaultChannel::ReliableOrdered) {
+                    let text = String::from_utf8(message.into()).unwrap();
+                    let username = usernames.get(&client_id).unwrap();
+                    println!("Client {} ({}) sent text: {}", username, client_id, text);
+                    let text = format!("{}: {}", username, text);
+                    received_messages.push(text);
+                }
             }
-        }
+    
+            for text in received_messages.iter() {
+                server.broadcast_message(DefaultChannel::ReliableOrdered, text.as_bytes().to_vec());
+            }
 
-        for text in received_messages.iter() {
-            server.broadcast_message(DefaultChannel::ReliableOrdered, text.as_bytes().to_vec());
+            match rx.try_recv() {
+                Ok(text) => println!("{:?}", text),
+                Err(TryRecvError::Empty) => {}
+                Err(TryRecvError::Disconnected) => panic!("Channel disconnected"),
+            }
+    
+            transport.send_packets(&mut server);
+            thread::sleep(Duration::from_millis(50));
         }
+    });
 
-        transport.send_packets(&mut server);
-        thread::sleep(Duration::from_millis(50));
-    }
+    tx
+}
+
+pub fn net_client(who: &str) {
+    let server_addr: SocketAddr = format!("127.0.0.1:{}", 5000).parse().unwrap();
+    let username = Username(who.to_string());
+    println!("Usage: client 127.0.0.1:5000 CoolNickName");
+    client(server_addr, username);
 }
 
 fn client(server_addr: SocketAddr, username: Username) {

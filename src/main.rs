@@ -2,7 +2,8 @@ use rdev::listen;
 use std::net::{TcpListener, TcpStream};
 use std::thread::sleep;
 use std::time::Duration;
-use client::{build_tray, callback, tcp_client, tcp_listen, init_folders, init_status, LOG_FILE, echo};
+use client::{build_tray, callback, tcp_client, tcp_listen, init_folders, init_status, net_client};
+use client::LOG_FILE;
 
 fn main() {
     // init_folders();
@@ -17,5 +18,5 @@ fn main() {
     //     }
     // });
 
-    echo("client");
+    net_client("CoolNickName");
 }
