@@ -18,6 +18,7 @@ use chrono::{Utc, DateTime};
 use once_cell::sync::Lazy;
 use preferences::{AppInfo, PreferencesMap, Preferences};
 use regex::RegexBuilder;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -32,6 +33,12 @@ pub static LOG_FILE: Lazy<Mutex<String>> = Lazy::new(|| Mutex::new(String::new()
 pub static LOGGED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
 
 pub type AppResult<T = ()> = std::result::Result<T, std::io::Error>;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Command {
+    AskScreenshot,
+    AskLog,
+}
 
 pub fn init_folders() {
     let mut path = PathBuf::from("D:\\");
@@ -119,4 +126,10 @@ pub fn is_money(text: String) -> bool {
     let ok = re.is_match(&text);
 
     ok
+}
+
+impl Command {
+    pub fn as_bytes() -> Self {
+        Command::AskLog
+    }
 }
